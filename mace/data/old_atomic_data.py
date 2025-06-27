@@ -20,8 +20,6 @@ from mace.tools import (
 from .neighborhood import get_neighborhood
 from .utils import Configuration
 
-#from neighborhood import get_neighborhood
-#from utils import Configuration
 
 class AtomicData(torch_geometric.data.Data):
     num_graphs: torch.Tensor
@@ -40,12 +38,8 @@ class AtomicData(torch_geometric.data.Data):
     virials: torch.Tensor
     dipole: torch.Tensor
     charges: torch.Tensor
-    #Added XDM and Veff attributes
-    M1: torch.Tensor
-    M2: torch.Tensor
-    M3: torch.Tensor
-    Veff: torch.Tensor
-    ###########################
+    total_charge: torch.Tensor
+    total_spin: torch.Tensor
     weight: torch.Tensor
     energy_weight: torch.Tensor
     forces_weight: torch.Tensor
@@ -53,11 +47,7 @@ class AtomicData(torch_geometric.data.Data):
     virials_weight: torch.Tensor
     dipole_weight: torch.Tensor
     charges_weight: torch.Tensor
-    #Added XDM and Veff weights 
-    m1_weight: torch.Tensor
-    m2_weight: torch.Tensor
-    m3_weight: torch.Tensor
-    Veff_weight: torch.Tensor
+
     def __init__(
         self,
         edge_index: torch.Tensor,  # [2, n_edges]
@@ -74,23 +64,15 @@ class AtomicData(torch_geometric.data.Data):
         virials_weight: Optional[torch.Tensor],  # [,]
         dipole_weight: Optional[torch.Tensor],  # [,]
         charges_weight: Optional[torch.Tensor],  # [,]
-        #Added XDM and Veff weights in constructor
-        m1_weight: Optional[torch.Tensor], #[,]
-        m2_weight: Optional[torch.Tensor], #[,]
-        m3_weight: Optional[torch.Tensor], #[,]
-        Veff_weight: Optional[torch.Tensor], #[,]
-        #####
         forces: Optional[torch.Tensor],  # [n_nodes, 3]
         energy: Optional[torch.Tensor],  # [, ]
         stress: Optional[torch.Tensor],  # [1,3,3]
         virials: Optional[torch.Tensor],  # [1,3,3]
         dipole: Optional[torch.Tensor],  # [, 3]
         charges: Optional[torch.Tensor],  # [n_nodes, ]
-        #Added XDM and Veff in constructor
-        M1: Optional[torch.Tensor], # [n_nodes, ]
-        M2: Optional[torch.Tensor], # [n_nodes, ]
-        M3: Optional[torch.Tensor], #[n_nodes, ]
-        Veff: Optional[torch.Tensor]
+        elec_temp: Optional[torch.Tensor],  # [,]
+        total_charge: Optional[torch.Tensor] = None,  # [,]
+        total_spin: Optional[torch.Tensor] = None,  # [,]
     ):
         # Check shapes
         num_nodes = node_attrs.shape[0]
@@ -108,12 +90,6 @@ class AtomicData(torch_geometric.data.Data):
         assert virials_weight is None or len(virials_weight.shape) == 0
         assert dipole_weight is None or dipole_weight.shape == (1, 3), dipole_weight
         assert charges_weight is None or len(charges_weight.shape) == 0
-        #Added XDM and Veff weights in check shape
-        assert m1_weight is None or len(m1_weight.shape) == 0
-        assert m2_weight is None or len(m2_weight.shape) == 0
-        assert m3_weight is None or len(m3_weight.shape) == 0
-        assert Veff_weight is None or len(Veff_weight.shape) == 0
-        ###
         assert cell is None or cell.shape == (3, 3)
         assert forces is None or forces.shape == (num_nodes, 3)
         assert energy is None or len(energy.shape) == 0
@@ -121,13 +97,9 @@ class AtomicData(torch_geometric.data.Data):
         assert virials is None or virials.shape == (1, 3, 3)
         assert dipole is None or dipole.shape[-1] == 3
         assert charges is None or charges.shape == (num_nodes,)
-        #Added XDM and Veff check shapes 
-        assert M1 is None or M1.shape == (num_nodes, )
-        assert M2 is None or M2.shape == (num_nodes, )
-        assert M3 is None or M3.shape == (num_nodes, )
-        assert Veff is None or Veff.shape == (num_nodes, )
-        ####
-        
+        assert elec_temp is None or len(elec_temp.shape) == 0
+        assert total_charge is None or len(total_charge.shape) == 0
+        assert total_spin is None or len(total_spin.shape) == 0
         # Aggregate data
         data = {
             "num_nodes": num_nodes,
@@ -145,23 +117,15 @@ class AtomicData(torch_geometric.data.Data):
             "virials_weight": virials_weight,
             "dipole_weight": dipole_weight,
             "charges_weight": charges_weight,
-            #Added XDM and Veff weights to aggregate
-            "m1_weight": m1_weight,
-            "m2_weight": m2_weight,
-            "m3_weight": m3_weight,
-            "Veff_weight": Veff,
-            ###
             "forces": forces,
             "energy": energy,
             "stress": stress,
             "virials": virials,
             "dipole": dipole,
             "charges": charges,
-            #Added XDM and Veff to aggregate
-            "M1": M1,
-            "M2": M2,
-            "M3": M3,
-            "Veff": Veff 
+            "elec_temp": elec_temp,
+            "total_charge": total_charge,
+            "total_spin": total_spin,
         }
         super().__init__(**data)
 
@@ -261,37 +225,6 @@ class AtomicData(torch_geometric.data.Data):
             if config.property_weights.get("charges") is not None
             else torch.tensor(1.0, dtype=torch.get_default_dtype())
         )
-        #Added XDM and Veff weights 
-        m1_weight = (
-            torch.tensor(
-                config.property_weights.get("m1"), dtype=torch.get_default_dtype()
-            )
-            if config.property_weights.get("m1") is not None
-            else torch.tensor(1.0, dtype=torch.get_default_dtype())
-        )
-        m2_weight = (
-            torch.tensor(
-                config.property_weights.get("m2"), dtype=torch.get_default_dtype()
-            )
-            if config.property_weights.get("m2") is not None
-            else torch.tensor(1.0, dtype=torch.get_default_dtype())
-        )
-        m3_weight = (
-            torch.tensor(
-                config.property_weights.get("m3"), dtype=torch.get_default_dtype()
-            )
-            if config.property_weights.get("m3") is not None
-            else torch.tensor(1.0, dtype=torch.get_default_dtype())
-        )
-        Veff_weight = (
-            torch.tensor(
-                config.property_weights.get("Veff"), dtype=torch.get_default_dtype()
-            )
-            if config.property_weights.get("Veff") is not None
-            else torch.tensor(1.0, dtype=torch.get_default_dtype())
-        )
-
-        ####
 
         forces = (
             torch.tensor(
@@ -339,35 +272,30 @@ class AtomicData(torch_geometric.data.Data):
             if config.properties.get("charges") is not None
             else torch.zeros(num_atoms, dtype=torch.get_default_dtype())
         )
-        M1 = (
+        elec_temp = (
             torch.tensor(
-                config.properties.get("M1"), dtype=torch.get_default_dtype()
+                config.properties.get("elec_temp"),
+                dtype=torch.get_default_dtype(),
             )
-            if config.properties.get("M1") is not None
-            else torch.zeros(num_atoms, dtype=torch.get_default_dtype())
+            if config.properties.get("elec_temp") is not None
+            else torch.tensor(0.0, dtype=torch.get_default_dtype())
         )
-        M2 = (
+
+        total_charge = (
             torch.tensor(
-                config.properties.get("M2"), dtype=torch.get_default_dtype()
+                config.properties.get("total_charge"), dtype=torch.get_default_dtype()
             )
-            if config.properties.get("M2") is not None
-            else torch.zeros(num_atoms, dtype=torch.get_default_dtype())
+            if config.properties.get("total_charge") is not None
+            else torch.tensor(0.0, dtype=torch.get_default_dtype())
         )
-        M3 = (
+        total_spin = (
             torch.tensor(
-                config.properties.get("M3"), dtype=torch.get_default_dtype()
+                config.properties.get("total_spin"), dtype=torch.get_default_dtype()
             )
-            if config.properties.get("M3") is not None
-            else torch.zeros(num_atoms, dtype=torch.get_default_dtype())
+            if config.properties.get("total_spin") is not None
+            else torch.tensor(1.0, dtype=torch.get_default_dtype())
         )
-        Veff = (
-            torch.tensor(
-                config.properties.get("Veff"), dtype=torch.get_default_dtype()
-            )
-            if config.properties.get("Veff") is not None
-            else torch.tensor(num_atoms, dtype=torch.get_default_dtype())
-        )
-        
+
         return cls(
             edge_index=torch.tensor(edge_index, dtype=torch.long),
             positions=torch.tensor(config.positions, dtype=torch.get_default_dtype()),
@@ -383,20 +311,15 @@ class AtomicData(torch_geometric.data.Data):
             virials_weight=virials_weight,
             dipole_weight=dipole_weight,
             charges_weight=charges_weight,
-            m1_weight=m1_weight,
-            m2_weight=m2_weight,
-            m3_weight=m3_weight,
-            Veff_weight=Veff_weight,
             forces=forces,
             energy=energy,
             stress=stress,
             virials=virials,
             dipole=dipole,
             charges=charges,
-            M1=M1,
-            M2=M2,
-            M3=M3,
-            Veff=Veff
+            elec_temp=elec_temp,
+            total_charge=total_charge,
+            total_spin=total_spin,
         )
 
 

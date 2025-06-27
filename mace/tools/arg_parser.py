@@ -973,6 +973,34 @@ def build_preprocess_arg_parser() -> argparse.ArgumentParser:
         type=str,
         default=DefaultKeys.CHARGES.value,
     )
+
+#Added XDM and Veff to arguments
+    parser.add_argument(
+        "--M1_key",
+        help="Key of the XDM_1 in training xyz",
+        type=str,
+        default=DefaultKeys.M1.value,
+    )
+    parser.add_argument(
+        "--M2_key",
+        help="Key of the XDM_2 in training xyz",
+        type=str,
+        default=DefaultKeys.M2.value,
+    )
+    parser.add_argument(
+        "--M3_key",
+        help="Key of the XDM_3 in training xyz",
+        type=str,
+        default=DefaultKeys.M3.value,
+    )
+    parser.add_argument(
+        "--Veff_key",
+        help="Key of the Veff in training xyz",
+        type=str,
+        default=DefaultKeys.VEFF.value,
+    )
+###############################################
+    
     parser.add_argument(
         "--atomic_numbers",
         help="List of atomic numbers",

@@ -15,6 +15,8 @@ import numpy as np
 
 from mace.tools import AtomicNumberTable, DefaultKeys
 
+from ase.atom import atomproperty
+
 Positions = np.ndarray  # [..., 3]
 Cell = np.ndarray  # [3,3]
 Pbc = tuple  # (3,)
@@ -22,6 +24,7 @@ Pbc = tuple  # (3,)
 DEFAULT_CONFIG_TYPE = "Default"
 DEFAULT_CONFIG_TYPE_WEIGHTS = {DEFAULT_CONFIG_TYPE: 1.0}
 
+xdm_1 = atomproperty("m1", "First XDM multipole")
 
 @dataclass
 class KeySpecification:
@@ -58,6 +61,10 @@ def update_keyspec_from_kwargs(
         "elec_temp_key",
         "total_charge_key",
         "total_spin_key",
+        "M1_key",
+        "M2_key",
+        "M3_key",
+        "Veff_key"
     ]
     arrays = ["forces_key", "charges_key"]
     info_keys = {}
@@ -144,6 +151,8 @@ def config_from_atoms_list(
 
 
 def config_from_atoms(
+
+        
     atoms: ase.Atoms,
     key_specification: KeySpecification = KeySpecification(),
     config_type_weights: Optional[Dict[str, float]] = None,
@@ -211,6 +220,7 @@ def test_config_types(
 
 
 def load_from_xyz(
+
     file_path: str,
     key_specification: KeySpecification,
     head_name: str = "Default",
@@ -223,14 +233,77 @@ def load_from_xyz(
     forces_key = key_specification.arrays_keys["forces"]
     stress_key = key_specification.info_keys["stress"]
     head_key = key_specification.info_keys["head"]
+
+    ### Add key of these new atomic properties ###
+    m1_key = key_specification.info_keys["M1"]
+    m2_key = key_specification.info_keys["M2"]
+    m3_key = key_specification.info_keys["M3"]
+    Veff_key = key_specification.info_keys["Veff"]
+
+    ###############################################
+    
+    if m1_key == "M1":
+        logging.warning("Detected key of multipole")
+        for atoms in atoms_list:
+            try:
+                atoms.info["M1"] = atoms.get_initial_m1s()
+
+                if(len(atoms.info["M1"])==24):
+                    print("Multipole xdm 1",atoms.info["M1"], len(atoms.info["M1"]) )
+
+                        
+                
+            except Exception as e:
+                logging.error(f"Failed to retrieve multipoles m1")
+                
+
+    if m2_key == "M2":
+        logging.warning("Detected key of multipole")
+        for atoms in atoms_list:
+            try:
+                atoms.info["M2"] = atoms.get_initial_m2s()
+
+            except Exception as e:
+                logging.error(f"Failed to retrieve multipoles m1")
+
+
+    if m3_key == "M3":
+        logging.warning("Detected key of multipole")
+        for atoms in atoms_list:
+            try:
+                atoms.info["M3"] = atoms.get_initial_m3s()
+
+            except Exception as e:
+                logging.error(f"Failed to retrieve multipoles m1")
+
+    if Veff_key == "Veff":
+        logging.warning("Detected key of effective volume")
+        for atoms in atoms_list:
+            try:
+                atoms.info["Veff"] = atoms.get_initial_Veffs()
+
+#The problem might be in get_in
+            except Exception as e:
+                logging.error(f"Failed to retrieve Veffs")
+
+
+
+                
+    ############################################33
+
     if energy_key == "energy":
         logging.warning(
             "Since ASE version 3.23.0b1, using energy_key 'energy' is no longer safe when communicating between MACE and ASE. We recommend using a different key, rewriting 'energy' to 'REF_energy'. You need to use --energy_key='REF_energy' to specify the chosen key name."
         )
         key_specification.info_keys["energy"] = "REF_energy"
+        #Edited
+        energy_key = "REF_energy"
         for atoms in atoms_list:
             try:
                 atoms.info["REF_energy"] = atoms.get_potential_energy()
+
+
+                               
             except Exception as e:  # pylint: disable=W0703
                 logging.error(f"Failed to extract energy: {e}")
                 atoms.info["REF_energy"] = None
@@ -347,13 +420,25 @@ def save_AtomicData_to_HDF5(data, i, h5_file) -> None:
     grp["forces_weight"] = data.forces_weight
     grp["stress_weight"] = data.stress_weight
     grp["virials_weight"] = data.virials_weight
+    #XDM and Veff weights added
+    grp["m1_weight"] = data.m1_weight
+    grp["m2_weight"] = data.m2_weight
+    grp["m3_weight"] = data.m3_weight
+    grp["Veff_weight"] = data.Veff_weight
+    ####]
     grp["forces"] = data.forces
     grp["energy"] = data.energy
     grp["stress"] = data.stress
     grp["virials"] = data.virials
     grp["dipole"] = data.dipole
     grp["charges"] = data.charges
+    #XDM and Veff added
+    grp["M1"] = data.M1
+    grp["M2"] = data.M2
+    grp["M3"] = data.M3
+    grp["Veff"] = data.Veff
     grp["head"] = data.head
+
 
 
 def save_configurations_as_HDF5(configurations: Configurations, _, h5_file) -> None:

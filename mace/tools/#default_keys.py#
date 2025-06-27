@@ -19,7 +19,7 @@ class DefaultKeys(Enum):
     M1="M1"
     M2="M2"
     M3="M3"
-    VEFF="Veff"
+    VEFF="patito"
 
     @staticmethod
     def keydict() -> dict[str, str]:
