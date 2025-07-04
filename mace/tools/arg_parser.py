@@ -133,6 +133,7 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
             "ScaleShiftBOTNet",
             "AtomicDipolesMACE",
             "EnergyDipolesMACE",
+            "XDMsAndVeffMACE",
         ],
     )
     parser.add_argument(
@@ -583,6 +584,7 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
             "universal",
             "energy_forces_dipole",
             "l1l2energyforces",
+            "xdm_veff"
         ],
     )
     parser.add_argument(
@@ -632,6 +634,30 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--dipole_weight", help="weight of dipoles loss", type=float, default=1.0
     )
+    # Added XDMs and Veffs weight flags 
+
+    parser.add_argument(
+        "--M1_weight", help="weight of first xdm loss", type=float, default=1.0
+     )
+
+
+    parser.add_argument(
+        "--M2_weight", help="weight of second xdm loss", type=float, default=1.0
+     )
+
+
+    parser.add_argument(
+        "--M3_weight", help="weight of third xdm loss", type=float, default=1.0
+     )
+
+    
+    parser.add_argument(
+        "--Veff_weight", help="weight of effective volume loss", type=float, default=1.0
+     )
+
+
+    ############
+    
     parser.add_argument(
         "--swa_dipole_weight",
         "--stage_two_dipole_weight",

@@ -154,6 +154,52 @@ def weighted_mean_squared_error_dipole(
     raw_loss = torch.square((ref["dipole"] - pred["dipole"]) / num_atoms)
     return reduce_loss(raw_loss, ddp)
 
+#-------------------------------------------------------------------------------
+# XDM Multipole M1 Loss Function
+#-------------------------------------------------------------------------------
+
+def weighted_mean_squared_error_M1(
+    ref: Batch, pred: TensorDict, ddp: Optional[bool] = None
+) -> torch.Tensor:
+    num_atoms = (ref.ptr[1:] - ref.ptr[:-1]).unsqueeze(-1)
+    raw_loss = torch.square((ref["M1"] - pred["M1"]) / num_atoms)
+    return reduce_loss(raw_loss, ddp)
+
+#-------------------------------------------------------------------------------
+# XDM Multipole M2 Loss Function
+#-------------------------------------------------------------------------------
+
+def weighted_mean_squared_error_M2(
+    ref: Batch, pred: TensorDict, ddp: Optional[bool] = None
+) -> torch.Tensor:
+    num_atoms = (ref.ptr[1:] - ref.ptr[:-1]).unsqueeze(-1)
+    raw_loss = torch.square((ref["M2"] - pred["M2"]) / num_atoms)
+    return reduce_loss(raw_loss, ddp)
+
+#-------------------------------------------------------------------------------
+# XDM Multipole M3 Loss Function
+#-------------------------------------------------------------------------------
+
+def weighted_mean_squared_error_M3(
+    ref: Batch, pred: TensorDict, ddp: Optional[bool] = None
+) -> torch.Tensor:
+    num_atoms = (ref.ptr[1:] - ref.ptr[:-1]).unsqueeze(-1)
+    raw_loss = torch.square((ref["M3"] - pred["M3"]) / num_atoms)
+    return reduce_loss(raw_loss, ddp)
+
+
+#-------------------------------------------------------------------------------
+# Effective Volume Veff  Loss Function
+#-------------------------------------------------------------------------------
+
+def weighted_mean_squared_error_Veff(
+    ref: Batch, pred: TensorDict, ddp: Optional[bool] = None
+) -> torch.Tensor:
+    num_atoms = (ref.ptr[1:] - ref.ptr[:-1]).unsqueeze(-1)
+    raw_loss = torch.square((ref["Veff"] - pred["Veff"]) / num_atoms)
+    return reduce_loss(raw_loss, ddp)
+
+
 
 # ------------------------------------------------------------------------------
 # Conditional Losses for Forces
@@ -222,6 +268,45 @@ def conditional_huber_forces(
 # ------------------------------------------------------------------------------
 
 
+
+# Loss for all the XDMs and Veffs at the same time, maybe it would
+# be better individually? ... Je ne sais pas
+
+class WeightedXDMsVeffLoss(torch.nn.Module):
+    def __init__(self, M1_weight=1.0, M2_weight=1.0, M3_weight=1.0, Veff_weight=1.0) -> None:
+        super().__init__()
+        self.register_buffer(
+            "M1_weight",
+            torch.tensor(M1_weight, dtype=torch.get_default_dtype()),
+        )
+        self.register_buffer(
+            "M2_weight",
+            torch.tensor(M2_weight, dtype=torch.get_default_dtype()),
+        )
+        self.register_buffer(
+            "M3_weight",
+            torch.tensor(M3_weight, dtype=torch.get_default_dtype()),
+        )
+        self.register_buffer(
+            "Veff_weight",
+            torch.tensor(Veff_weight, dtype=torch.get_default_dtype()),
+        )
+        
+        def forward(
+                self, ref: Batch, pred: TensorDict, ddp: Optional[bool] = None
+        ) -> torch.Tensor:
+            loss_M1 = weighted_mean_squared_error_M1(ref, pred, ddp)
+            loss_M2 = weighted_mean_squared_error_M2(ref, pred, ddp)
+            loss_M3 = weighted_mean_squared_error_M3(ref, pred, ddp)
+            loss_Veff = weighted_mean_squared_error_Veff(ref, pred, ddp)
+            return self.M1_weight*loss_M1 + self.M2_weight*loss_M2 + self.M3_weight*loss_M3 + self.Veff_weight*loss_Veff
+
+        def __repr__(self):
+            return (
+                f"{self.__class__.__name__}(M1_weight={self.M1_weight:.3f}, "
+                f"M2_weight={self.M2_weight:.3f})"
+                )
+######### 
 class WeightedEnergyForcesLoss(torch.nn.Module):
     def __init__(self, energy_weight=1.0, forces_weight=1.0) -> None:
         super().__init__()

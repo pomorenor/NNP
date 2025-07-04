@@ -54,9 +54,9 @@ class AtomicData(torch_geometric.data.Data):
     dipole_weight: torch.Tensor
     charges_weight: torch.Tensor
     #Added XDM and Veff weights 
-    m1_weight: torch.Tensor
-    m2_weight: torch.Tensor
-    m3_weight: torch.Tensor
+    M1_weight: torch.Tensor
+    M2_weight: torch.Tensor
+    M3_weight: torch.Tensor
     Veff_weight: torch.Tensor
     def __init__(
         self,
@@ -75,9 +75,9 @@ class AtomicData(torch_geometric.data.Data):
         dipole_weight: Optional[torch.Tensor],  # [,]
         charges_weight: Optional[torch.Tensor],  # [,]
         #Added XDM and Veff weights in constructor
-        m1_weight: Optional[torch.Tensor], #[,]
-        m2_weight: Optional[torch.Tensor], #[,]
-        m3_weight: Optional[torch.Tensor], #[,]
+        M1_weight: Optional[torch.Tensor], #[,]
+        M2_weight: Optional[torch.Tensor], #[,]
+        M3_weight: Optional[torch.Tensor], #[,]
         Veff_weight: Optional[torch.Tensor], #[,]
         #####
         forces: Optional[torch.Tensor],  # [n_nodes, 3]
@@ -109,9 +109,9 @@ class AtomicData(torch_geometric.data.Data):
         assert dipole_weight is None or dipole_weight.shape == (1, 3), dipole_weight
         assert charges_weight is None or len(charges_weight.shape) == 0
         #Added XDM and Veff weights in check shape
-        assert m1_weight is None or len(m1_weight.shape) == 0
-        assert m2_weight is None or len(m2_weight.shape) == 0
-        assert m3_weight is None or len(m3_weight.shape) == 0
+        assert M1_weight is None or len(M1_weight.shape) == 0
+        assert M2_weight is None or len(M2_weight.shape) == 0
+        assert M3_weight is None or len(M3_weight.shape) == 0
         assert Veff_weight is None or len(Veff_weight.shape) == 0
         ###
         assert cell is None or cell.shape == (3, 3)
@@ -146,9 +146,9 @@ class AtomicData(torch_geometric.data.Data):
             "dipole_weight": dipole_weight,
             "charges_weight": charges_weight,
             #Added XDM and Veff weights to aggregate
-            "m1_weight": m1_weight,
-            "m2_weight": m2_weight,
-            "m3_weight": m3_weight,
+            "M1_weight": M1_weight,
+            "M2_weight": M2_weight,
+            "M3_weight": M3_weight,
             "Veff_weight": Veff,
             ###
             "forces": forces,
@@ -262,25 +262,25 @@ class AtomicData(torch_geometric.data.Data):
             else torch.tensor(1.0, dtype=torch.get_default_dtype())
         )
         #Added XDM and Veff weights 
-        m1_weight = (
+        M1_weight = (
             torch.tensor(
-                config.property_weights.get("m1"), dtype=torch.get_default_dtype()
+                config.property_weights.get("M1"), dtype=torch.get_default_dtype()
             )
-            if config.property_weights.get("m1") is not None
+            if config.property_weights.get("M1") is not None
             else torch.tensor(1.0, dtype=torch.get_default_dtype())
         )
-        m2_weight = (
+        M2_weight = (
             torch.tensor(
-                config.property_weights.get("m2"), dtype=torch.get_default_dtype()
+                config.property_weights.get("M2"), dtype=torch.get_default_dtype()
             )
-            if config.property_weights.get("m2") is not None
+            if config.property_weights.get("M2") is not None
             else torch.tensor(1.0, dtype=torch.get_default_dtype())
         )
-        m3_weight = (
+        M3_weight = (
             torch.tensor(
-                config.property_weights.get("m3"), dtype=torch.get_default_dtype()
+                config.property_weights.get("M3"), dtype=torch.get_default_dtype()
             )
-            if config.property_weights.get("m3") is not None
+            if config.property_weights.get("M3") is not None
             else torch.tensor(1.0, dtype=torch.get_default_dtype())
         )
         Veff_weight = (
@@ -383,9 +383,9 @@ class AtomicData(torch_geometric.data.Data):
             virials_weight=virials_weight,
             dipole_weight=dipole_weight,
             charges_weight=charges_weight,
-            m1_weight=m1_weight,
-            m2_weight=m2_weight,
-            m3_weight=m3_weight,
+            M1_weight=M1_weight,
+            M2_weight=M2_weight,
+            M3_weight=M3_weight,
             Veff_weight=Veff_weight,
             forces=forces,
             energy=energy,

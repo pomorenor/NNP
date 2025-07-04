@@ -24,7 +24,7 @@ Pbc = tuple  # (3,)
 DEFAULT_CONFIG_TYPE = "Default"
 DEFAULT_CONFIG_TYPE_WEIGHTS = {DEFAULT_CONFIG_TYPE: 1.0}
 
-xdm_1 = atomproperty("m1", "First XDM multipole")
+
 
 @dataclass
 class KeySpecification:
@@ -242,49 +242,48 @@ def load_from_xyz(
 
     ###############################################
     
+    
+    
     if m1_key == "M1":
-        logging.warning("Detected key of multipole")
+        logging.warning("Detected key of multipole M1")
         for atoms in atoms_list:
-            try:
+            if "M1" in atoms.arrays:
+                atoms.set_initial_m1s(atoms.arrays["M1"])
                 atoms.info["M1"] = atoms.get_initial_m1s()
-
-                if(len(atoms.info["M1"])==24):
-                    print("Multipole xdm 1",atoms.info["M1"], len(atoms.info["M1"]) )
-
-                        
-                
-            except Exception as e:
-                logging.error(f"Failed to retrieve multipoles m1")
-                
+            else: 
+                logging.warning("Could not find 'M1' in atoms.arrays")
+           
 
     if m2_key == "M2":
-        logging.warning("Detected key of multipole")
+        logging.warning("Detected key of multipole M2")
         for atoms in atoms_list:
-            try:
+            if "M2" in atoms.arrays:
+                atoms.set_initial_m2s(atoms.arrays["M2"])
                 atoms.info["M2"] = atoms.get_initial_m2s()
+            else:
+                logging.warning("Could not find 'M2' in atoms.arrays")
 
-            except Exception as e:
-                logging.error(f"Failed to retrieve multipoles m1")
-
+    
 
     if m3_key == "M3":
-        logging.warning("Detected key of multipole")
+        logging.warning("Detected key of multipole M3")
         for atoms in atoms_list:
-            try:
+            if "M3" in atoms.arrays:
+                atoms.set_initial_m3s(atoms.arrays["M3"])
                 atoms.info["M3"] = atoms.get_initial_m3s()
+            else:
+                logging.warning("Could not find 'M3' in atoms.arrays")
 
-            except Exception as e:
-                logging.error(f"Failed to retrieve multipoles m1")
+        
 
     if Veff_key == "Veff":
-        logging.warning("Detected key of effective volume")
+        logging.warning("Detected key for Veff")
         for atoms in atoms_list:
-            try:
+            if "Veff" in atoms.arrays:
+                atoms.set_initial_Veffs(atoms.arrays["Veff"])
                 atoms.info["Veff"] = atoms.get_initial_Veffs()
-
-#The problem might be in get_in
-            except Exception as e:
-                logging.error(f"Failed to retrieve Veffs")
+            else:
+                logging.warning("Could not find 'Veff' in atoms.arrays")
 
 
 
