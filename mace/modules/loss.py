@@ -304,8 +304,10 @@ class WeightedXDMsVeffLoss(torch.nn.Module):
         def __repr__(self):
             return (
                 f"{self.__class__.__name__}(M1_weight={self.M1_weight:.3f}, "
-                f"M2_weight={self.M2_weight:.3f})"
-                )
+                f"M2_weight={self.M2_weight:.3f}, "
+                f"M3_weight={self.M3_weight:.3f}, "
+                f"Veff_weight={self.Veff_weight:.3f})"
+            )
 ######### 
 class WeightedEnergyForcesLoss(torch.nn.Module):
     def __init__(self, energy_weight=1.0, forces_weight=1.0) -> None:
