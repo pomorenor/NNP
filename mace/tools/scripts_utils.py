@@ -626,6 +626,13 @@ def get_loss_fn(
             forces_weight=args.forces_weight,
             dipole_weight=args.dipole_weight,
         )
+    elif args.loss == "xdm_veff":
+        loss_fn = modules.loss.WeightedXDMsVeffLoss(
+            M1_weight= args.M1_weight,
+            M2_weight= args.M2_weight,
+            M3_weight= args.M3_weight,
+            Veff_weight= args.Veff_weight
+        )
     else:
         loss_fn = modules.WeightedEnergyForcesLoss(energy_weight=1.0, forces_weight=1.0)
     return loss_fn

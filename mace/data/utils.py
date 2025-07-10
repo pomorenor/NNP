@@ -61,12 +61,12 @@ def update_keyspec_from_kwargs(
         "elec_temp_key",
         "total_charge_key",
         "total_spin_key",
-        "M1_key",
-        "M2_key",
-        "M3_key",
-        "Veff_key"
+        #"M1_key",
+        #"M2_key",
+        #"M3_key",
+        #"Veff_key"
     ]
-    arrays = ["forces_key", "charges_key"]
+    arrays = ["forces_key", "charges_key", "M1_key", "M2_key", "M3_key", "Veff_key"]
     info_keys = {}
     arrays_keys = {}
     for key in infos:
@@ -235,10 +235,10 @@ def load_from_xyz(
     head_key = key_specification.info_keys["head"]
 
     ### Add key of these new atomic properties ###
-    m1_key = key_specification.info_keys["M1"]
-    m2_key = key_specification.info_keys["M2"]
-    m3_key = key_specification.info_keys["M3"]
-    Veff_key = key_specification.info_keys["Veff"]
+    m1_key = key_specification.arrays_keys["M1"]
+    m2_key = key_specification.arrays_keys["M2"]
+    m3_key = key_specification.arrays_keys["M3"]
+    Veff_key = key_specification.arrays_keys["Veff"]
 
     ###############################################
     
@@ -249,7 +249,7 @@ def load_from_xyz(
         for atoms in atoms_list:
             if "M1" in atoms.arrays:
                 atoms.set_initial_m1s(atoms.arrays["M1"])
-                atoms.info["M1"] = atoms.get_initial_m1s()
+                atoms.arrays["M1"] = atoms.get_initial_m1s()
             else: 
                 logging.warning("Could not find 'M1' in atoms.arrays")
            
@@ -259,7 +259,9 @@ def load_from_xyz(
         for atoms in atoms_list:
             if "M2" in atoms.arrays:
                 atoms.set_initial_m2s(atoms.arrays["M2"])
-                atoms.info["M2"] = atoms.get_initial_m2s()
+                atoms.arrays["M2"] = atoms.get_initial_m2s()
+                if(len(atoms.arrays["M2"] == 24 )):
+                    print(atoms.arrays["M2"])
             else:
                 logging.warning("Could not find 'M2' in atoms.arrays")
 
@@ -270,7 +272,7 @@ def load_from_xyz(
         for atoms in atoms_list:
             if "M3" in atoms.arrays:
                 atoms.set_initial_m3s(atoms.arrays["M3"])
-                atoms.info["M3"] = atoms.get_initial_m3s()
+                atoms.arrays["M3"] = atoms.get_initial_m3s()
             else:
                 logging.warning("Could not find 'M3' in atoms.arrays")
 

@@ -457,7 +457,7 @@ def run(args) -> None:
         args.compute_virials = False
         args.compute_stress = False
     # Adding model to compute xdms and Veff
-    else if args.model == "XDMsAndVeffMACE":
+    if args.model == "XDMsAndVeffMACE":
         atomic_energies = None
         dipole_only = False
         args.compute_dipole = False
@@ -465,10 +465,10 @@ def run(args) -> None:
         args.compute_forces = False
         args.compute_virials = False
         args.compute_stress = False
-        args.compute_M1 = True
-        args.compute_M2 = True
-        args.compute_M3 = True
-        args.compute_Veff = True
+        #args.compute_M1 = True
+        #args.compute_M2 = True
+        #args.compute_M3 = True
+        #args.compute_Veff = True
     else:
         dipole_only = False
         if args.model == "EnergyDipolesMACE":
