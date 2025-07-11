@@ -292,22 +292,22 @@ class WeightedXDMsVeffLoss(torch.nn.Module):
             torch.tensor(Veff_weight, dtype=torch.get_default_dtype()),
         )
         
-        def forward(
-                self, ref: Batch, pred: TensorDict, ddp: Optional[bool] = None
+    def forward(
+        self, ref: Batch, pred: TensorDict, ddp: Optional[bool] = None
         ) -> torch.Tensor:
-            loss_M1 = weighted_mean_squared_error_M1(ref, pred, ddp)
-            loss_M2 = weighted_mean_squared_error_M2(ref, pred, ddp)
-            loss_M3 = weighted_mean_squared_error_M3(ref, pred, ddp)
-            loss_Veff = weighted_mean_squared_error_Veff(ref, pred, ddp)
-            return self.M1_weight*loss_M1 + self.M2_weight*loss_M2 + self.M3_weight*loss_M3 + self.Veff_weight*loss_Veff
+        loss_M1 = weighted_mean_squared_error_M1(ref, pred, ddp)
+        loss_M2 = weighted_mean_squared_error_M2(ref, pred, ddp)
+        loss_M3 = weighted_mean_squared_error_M3(ref, pred, ddp)
+        loss_Veff = weighted_mean_squared_error_Veff(ref, pred, ddp)
+        return self.M1_weight*loss_M1 + self.M2_weight*loss_M2 + self.M3_weight*loss_M3 + self.Veff_weight*loss_Veff
 
-        def __repr__(self):
-            return (
-                f"{self.__class__.__name__}(M1_weight={self.M1_weight:.3f}, "
-                f"M2_weight={self.M2_weight:.3f}, "
-                f"M3_weight={self.M3_weight:.3f}, "
-                f"Veff_weight={self.Veff_weight:.3f})"
-            )
+    def __repr__(self):
+        return (
+            f"{self.__class__.__name__}(M1_weight={self.M1_weight:.3f}, "
+            f"M2_weight={self.M2_weight:.3f}, "
+            f"M3_weight={self.M3_weight:.3f}, "
+            f"Veff_weight={self.Veff_weight:.3f})"
+        )
 ######### 
 class WeightedEnergyForcesLoss(torch.nn.Module):
     def __init__(self, energy_weight=1.0, forces_weight=1.0) -> None:

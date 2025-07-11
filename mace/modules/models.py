@@ -1083,7 +1083,7 @@ class EnergyDipolesMACE(torch.nn.Module):
 # Adding XDM and Veff model
 
 @compile_mode("script")
-class XDMsAndVeffMace(torch.nn.Module):
+class XDMsAndVeffMACE(torch.nn.Module):
     def __init__(
         self,
         r_max: float,
@@ -1114,8 +1114,11 @@ class XDMsAndVeffMace(torch.nn.Module):
         self.register_buffer("atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64))
         self.register_buffer("r_max", torch.tensor(r_max, dtype=torch.float64))
         self.register_buffer("num_interactions", torch.tensor(num_interactions, dtype=torch.int64))
-        assert atomic_energies is None
-
+        
+        # Explicit energy-related safeguards
+        assert atomic_energies is None, "XDMsAndVeffMace does not use atomic energies"
+        self.atomic_energies_fn = None  # Explicitly disable atomic energies
+        
         # Embedding
         node_attr_irreps = o3.Irreps([(num_elements, (0, 1))])
         node_feats_irreps = o3.Irreps([(hidden_irreps.count(o3.Irrep(0, 1)), (0, 1))])
@@ -1123,6 +1126,7 @@ class XDMsAndVeffMace(torch.nn.Module):
             irreps_in=node_attr_irreps,
             irreps_out=node_feats_irreps
         )
+        
         self.radial_embedding = RadialEmbeddingBlock(
             r_max=r_max,
             num_bessel=num_bessel,
@@ -1143,7 +1147,9 @@ class XDMsAndVeffMace(torch.nn.Module):
         # Interactions and products
         self.interactions = torch.nn.ModuleList()
         self.products = torch.nn.ModuleList()
+        self.readouts = torch.nn.ModuleList()
 
+        # First interaction
         inter = interaction_cls_first(
             node_attrs_irreps=node_attr_irreps,
             node_feats_irreps=node_feats_irreps,
@@ -1166,7 +1172,21 @@ class XDMsAndVeffMace(torch.nn.Module):
         )
         self.products.append(prod)
 
-        for _ in range(num_interactions - 1):
+        # First readout (outputs 4 scalars: M1, M2, M3, Veff)
+        self.readouts.append(
+            NonLinearReadoutBlock(
+                hidden_irreps,
+                MLP_irreps,
+                gate,
+                o3.Irreps("4x0e"),  # Output 4 scalars
+                4,  # Number of outputs
+                cueq_config,
+                None
+            )
+        )
+
+        # Additional interactions
+        for i in range(num_interactions - 1):
             inter = interaction_cls(
                 node_attrs_irreps=node_attr_irreps,
                 node_feats_irreps=hidden_irreps,
@@ -1178,6 +1198,7 @@ class XDMsAndVeffMace(torch.nn.Module):
                 radial_MLP=radial_MLP,
             )
             self.interactions.append(inter)
+            
             prod = EquivariantProductBasisBlock(
                 node_feats_irreps=interaction_irreps,
                 target_irreps=hidden_irreps,
@@ -1186,13 +1207,19 @@ class XDMsAndVeffMace(torch.nn.Module):
                 use_sc=True,
             )
             self.products.append(prod)
-
-        # Readouts: nonlinear as required
-        concat_irreps = o3.Irreps(f"{num_interactions * hidden_irreps.dim}x0e")
-        self.readout_xdm1 = NonLinearReadoutBlock(concat_irreps, MLP_irreps, gate, o3.Irreps("1x0e"), 1, cueq_config, None)
-        self.readout_xdm2 = NonLinearReadoutBlock(concat_irreps, MLP_irreps, gate, o3.Irreps("1x0e"), 1, cueq_config, None)
-        self.readout_xdm3 = NonLinearReadoutBlock(concat_irreps, MLP_irreps, gate, o3.Irreps("1x0e"), 1, cueq_config, None)
-        self.readout_veff = NonLinearReadoutBlock(concat_irreps, MLP_irreps, gate, o3.Irreps("1x0e"), 1, cueq_config, None)
+            
+            # Add readout for this interaction
+            self.readouts.append(
+                NonLinearReadoutBlock(
+                    hidden_irreps,
+                    MLP_irreps,
+                    gate,
+                    o3.Irreps("4x0e"),  # Output 4 scalars
+                    4,  # Number of outputs
+                    cueq_config,
+                    None
+                )
+            )
 
     def forward(
         self,
@@ -1205,10 +1232,13 @@ class XDMsAndVeffMace(torch.nn.Module):
         compute_edge_forces: bool = False,
         compute_atomic_stresses: bool = False,
     ) -> Dict[str, Optional[torch.Tensor]]:
-        assert not compute_force
-        assert not compute_virials
-        assert not compute_stress
-        assert not compute_displacement
+        # Explicitly disable all energy/force-related computations
+        assert not compute_force, "XDMsAndVeffMace does not compute forces"
+        assert not compute_virials, "XDMsAndVeffMace does not compute virials"
+        assert not compute_stress, "XDMsAndVeffMace does not compute stress"
+        assert not compute_displacement, "XDMsAndVeffMace does not compute displacement"
+        assert not compute_edge_forces, "XDMsAndVeffMace does not compute edge forces"
+        assert not compute_atomic_stresses, "XDMsAndVeffMace does not compute atomic stresses"
 
         data["node_attrs"].requires_grad_(True)
         data["positions"].requires_grad_(True)
@@ -1225,8 +1255,15 @@ class XDMsAndVeffMace(torch.nn.Module):
             lengths, data["node_attrs"], data["edge_index"], self.atomic_numbers
         )
 
-        node_feats_list = []
-        for interaction, product in zip(self.interactions, self.products):
+        # Initialize lists to store predictions from each interaction
+        all_M1 = []
+        all_M2 = []
+        all_M3 = []
+        all_Veff = []
+
+        for interaction, product, readout in zip(
+            self.interactions, self.products, self.readouts
+        ):
             node_feats, sc = interaction(
                 node_attrs=data["node_attrs"],
                 node_feats=node_feats,
@@ -1240,15 +1277,27 @@ class XDMsAndVeffMace(torch.nn.Module):
                 sc=sc,
                 node_attrs=data["node_attrs"],
             )
-            node_feats_list.append(node_feats)
+            
+            # Get all 4 outputs at once
+            outputs = readout(node_feats)  # [n_nodes, 4]
+            
+            # Split into individual components
+            M1 = outputs[:, 0]
+            M2 = outputs[:, 1]
+            M3 = outputs[:, 2]
+            Veff = outputs[:, 3]
+            
+            # Store predictions from this interaction
+            all_M1.append(M1)
+            all_M2.append(M2)
+            all_M3.append(M3)
+            all_Veff.append(Veff)
 
-        node_feats_concat = torch.cat(node_feats_list, dim=-1)
-
-        # Readout: atomic outputs
-        M1 = self.readout_xdm1(node_feats_concat).squeeze(-1)
-        M2 = self.readout_xdm2(node_feats_concat).squeeze(-1)
-        M3 = self.readout_xdm3(node_feats_concat).squeeze(-1)
-        Veff = self.readout_veff(node_feats_concat).squeeze(-1)
+        # Sum contributions from all interactions
+        M1 = torch.sum(torch.stack(all_M1, dim=-1), dim=-1)
+        M2 = torch.sum(torch.stack(all_M2, dim=-1), dim=-1)
+        M3 = torch.sum(torch.stack(all_M3, dim=-1), dim=-1)
+        Veff = torch.sum(torch.stack(all_Veff, dim=-1), dim=-1)
 
         return {
             "M1": M1,

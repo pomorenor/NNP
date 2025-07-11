@@ -65,7 +65,7 @@ def configure_model(
                 )
         args.std = atomic_inter_scale
 
-    elif (args.mean is None or args.std is None) and args.model != "AtomicDipolesMACE":
+    elif (args.mean is None or args.std is None) and args.model != "AtomicDipolesMACE" and args.model != "XDMsAndVeffMACE":
         args.mean, args.std = modules.scaling_classes[args.scaling](
             train_loader, atomic_energies
         )
@@ -260,6 +260,20 @@ def _build_model(
             args.error_table == "DipoleRMSE"
         ), "Use error_table DipoleRMSE with AtomicDipolesMACE model"
         return modules.AtomicDipolesMACE(
+            **model_config,
+            correlation=args.correlation,
+            gate=modules.gate_dict[args.gate],
+            interaction_cls_first=modules.interaction_classes[
+                "RealAgnosticInteractionBlock"
+            ],
+            MLP_irreps=o3.Irreps(args.MLP_irreps),
+        )
+    if args.model == "XDMsAndVeffMACE":
+        assert args.loss == "xdm_veff", "Use dipole loss with AtomicDipolesMACE model"
+        assert (
+            args.error_table == "XDMsAndVeffMACERMSE"
+        ), "Use error_table XDMsAndVeffMACERMSE with XDMsAndVeffMACE model"
+        return modules.models.XDMsAndVeffMACE(
             **model_config,
             correlation=args.correlation,
             gate=modules.gate_dict[args.gate],

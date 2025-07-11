@@ -100,7 +100,7 @@ def create_error_table(
             "RMSE MU / mDebye / atom",
             "rel MU RMSE %",
         ]
-    elif table_type == "XDMsAndVeffMACERMSE":
+    elif table_type == "XDMVeffRMSE":
         table.field_names = [
             "config_type",
             "RMSE M1 / a.u.",
