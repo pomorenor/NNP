@@ -260,8 +260,8 @@ def load_from_xyz(
             if "M2" in atoms.arrays:
                 atoms.set_initial_m2s(atoms.arrays["M2"])
                 atoms.arrays["M2"] = atoms.get_initial_m2s()
-                if(len(atoms.arrays["M2"] == 24 )):
-                    print(atoms.arrays["M2"])
+                #if(len(atoms.arrays["M2"] == 24 )):
+                 #   print(atoms.arrays["M2"])
             else:
                 logging.warning("Could not find 'M2' in atoms.arrays")
 
