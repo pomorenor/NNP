@@ -1095,7 +1095,7 @@ class XDMsAndVeffMace(torch.nn.Module):
         num_interactions: int,
         num_elements: int,
         hidden_irreps: o3.Irreps,
-        MLP_irreps: o3.Irreps, 
+        MLP_irreps: o3.Irreps,
         avg_num_neighbors: float,
         atomic_numbers: List[int],
         correlation: int,
@@ -1117,10 +1117,11 @@ class XDMsAndVeffMace(torch.nn.Module):
         assert atomic_energies is None
 
         # Embedding
-        node_attr_irreps = o3.Irreps([(num_elements, (0,1))])
-        node_feats_irreps = o3.Irreps([(hidden_irreps.count(o3.Irrep(0,1)), (0,1))])
+        node_attr_irreps = o3.Irreps([(num_elements, (0, 1))])
+        node_feats_irreps = o3.Irreps([(hidden_irreps.count(o3.Irrep(0, 1)), (0, 1))])
         self.node_embedding = LinearNodeEmbeddingBlock(
-            irreps_in=node_attr_irreps, irreps_out=node_feats_irreps
+            irreps_in=node_attr_irreps,
+            irreps_out=node_feats_irreps
         )
         self.radial_embedding = RadialEmbeddingBlock(
             r_max=r_max,
@@ -1140,6 +1141,9 @@ class XDMsAndVeffMace(torch.nn.Module):
             radial_MLP = [64, 64, 64]
 
         # Interactions and products
+        self.interactions = torch.nn.ModuleList()
+        self.products = torch.nn.ModuleList()
+
         inter = interaction_cls_first(
             node_attrs_irreps=node_attr_irreps,
             node_feats_irreps=node_feats_irreps,
@@ -1150,24 +1154,17 @@ class XDMsAndVeffMace(torch.nn.Module):
             avg_num_neighbors=avg_num_neighbors,
             radial_MLP=radial_MLP,
         )
-        self.interactions = torch.nn.ModuleList([inter])
+        self.interactions.append(inter)
 
         use_sc_first = "Residual" in str(interaction_cls_first)
-        node_feats_irreps_out = inter.target_irreps
         prod = EquivariantProductBasisBlock(
-            node_feats_irreps=node_feats_irreps_out,
+            node_feats_irreps=inter.target_irreps,
             target_irreps=hidden_irreps,
             correlation=correlation,
             num_elements=num_elements,
             use_sc=use_sc_first,
         )
-        self.products = torch.nn.ModuleList([prod])
-
-        # Readouts
-        self.readout_xdm1 = LinearReadoutBlock(hidden_irreps, o3.Irreps("1x0e"))
-        self.readout_xdm2 = LinearReadoutBlock(hidden_irreps, o3.Irreps("1x0e"))
-        self.readout_xdm3 = LinearReadoutBlock(hidden_irreps, o3.Irreps("1x0e"))
-        self.readout_veff = LinearReadoutBlock(hidden_irreps, o3.Irreps("1x0e"))
+        self.products.append(prod)
 
         for _ in range(num_interactions - 1):
             inter = interaction_cls(
@@ -1189,6 +1186,13 @@ class XDMsAndVeffMace(torch.nn.Module):
                 use_sc=True,
             )
             self.products.append(prod)
+
+        # Readouts: nonlinear as required
+        concat_irreps = o3.Irreps(f"{num_interactions * hidden_irreps.dim}x0e")
+        self.readout_xdm1 = NonLinearReadoutBlock(concat_irreps, MLP_irreps, gate, o3.Irreps("1x0e"), 1, cueq_config, None)
+        self.readout_xdm2 = NonLinearReadoutBlock(concat_irreps, MLP_irreps, gate, o3.Irreps("1x0e"), 1, cueq_config, None)
+        self.readout_xdm3 = NonLinearReadoutBlock(concat_irreps, MLP_irreps, gate, o3.Irreps("1x0e"), 1, cueq_config, None)
+        self.readout_veff = NonLinearReadoutBlock(concat_irreps, MLP_irreps, gate, o3.Irreps("1x0e"), 1, cueq_config, None)
 
     def forward(
         self,
@@ -1221,6 +1225,7 @@ class XDMsAndVeffMace(torch.nn.Module):
             lengths, data["node_attrs"], data["edge_index"], self.atomic_numbers
         )
 
+        node_feats_list = []
         for interaction, product in zip(self.interactions, self.products):
             node_feats, sc = interaction(
                 node_attrs=data["node_attrs"],
@@ -1235,11 +1240,15 @@ class XDMsAndVeffMace(torch.nn.Module):
                 sc=sc,
                 node_attrs=data["node_attrs"],
             )
+            node_feats_list.append(node_feats)
 
-        Veff = self.readout_veff(node_feats).squeeze(-1)
-        M1 = self.readout_xdm1(node_feats).squeeze(-1)
-        M2 = self.readout_xdm2(node_feats).squeeze(-1)
-        M3 = self.readout_xdm3(node_feats).squeeze(-1)
+        node_feats_concat = torch.cat(node_feats_list, dim=-1)
+
+        # Readout: atomic outputs
+        M1 = self.readout_xdm1(node_feats_concat).squeeze(-1)
+        M2 = self.readout_xdm2(node_feats_concat).squeeze(-1)
+        M3 = self.readout_xdm3(node_feats_concat).squeeze(-1)
+        Veff = self.readout_veff(node_feats_concat).squeeze(-1)
 
         return {
             "M1": M1,
@@ -1247,7 +1256,6 @@ class XDMsAndVeffMace(torch.nn.Module):
             "M3": M3,
             "Veff": Veff,
         }
-
 
         
      
