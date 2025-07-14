@@ -1144,12 +1144,7 @@ class XDMsAndVeffMACE(torch.nn.Module):
         if radial_MLP is None:
             radial_MLP = [64, 64, 64]
 
-        # Interactions and products
-        self.interactions = torch.nn.ModuleList()
-        self.products = torch.nn.ModuleList()
-        self.readouts = torch.nn.ModuleList()
-
-        # First interaction
+        # Interactions and readouts 
         inter = interaction_cls_first(
             node_attrs_irreps=node_attr_irreps,
             node_feats_irreps=node_feats_irreps,
@@ -1160,40 +1155,48 @@ class XDMsAndVeffMACE(torch.nn.Module):
             avg_num_neighbors=avg_num_neighbors,
             radial_MLP=radial_MLP,
         )
-        self.interactions.append(inter)
+        self.interactions = torch.nn.ModuleList([inter])
 
-        use_sc_first = "Residual" in str(interaction_cls_first)
+        # Use the appropriate self connection at the first layer
+        
+        use_sc_first = False
+        if "Residual" in str(interaction_cls_first):
+            use_sc_first = True
+
+        node_feats_irreps_out = inter.target_irreps
+            
         prod = EquivariantProductBasisBlock(
-            node_feats_irreps=inter.target_irreps,
+            node_feats_irreps=node_feats_irreps_out,
             target_irreps=hidden_irreps,
             correlation=correlation,
             num_elements=num_elements,
             use_sc=use_sc_first,
         )
-        self.products.append(prod)
+        self.products = torch.nn.ModuleList([prod])
+        
+        
+        # Let us configure the readouts (outputs 4 scalars: M1, M2, M3, Veff)
 
-        # First readout (outputs 4 scalars: M1, M2, M3, Veff)
+        self.readouts = torch.nn.ModuleList() 
         self.readouts.append(
-            NonLinearReadoutBlock(
+            LinearReadoutBlock(
                 hidden_irreps,
-                MLP_irreps,
-                gate,
-                o3.Irreps("4x0e"),  # Output 4 scalars
-                4,  # Number of outputs
+                o3.Irreps("4x0e"),
                 cueq_config,
                 None
             )
         )
-
+            
         # Additional interactions
         for i in range(num_interactions - 1):
+            hidden_irreps_out = hidden_irreps
             inter = interaction_cls(
                 node_attrs_irreps=node_attr_irreps,
                 node_feats_irreps=hidden_irreps,
                 edge_attrs_irreps=sh_irreps,
                 edge_feats_irreps=edge_feats_irreps,
                 target_irreps=interaction_irreps,
-                hidden_irreps=hidden_irreps,
+                hidden_irreps=hidden_irreps_out,
                 avg_num_neighbors=avg_num_neighbors,
                 radial_MLP=radial_MLP,
             )
@@ -1201,26 +1204,36 @@ class XDMsAndVeffMACE(torch.nn.Module):
             
             prod = EquivariantProductBasisBlock(
                 node_feats_irreps=interaction_irreps,
-                target_irreps=hidden_irreps,
+                target_irreps=hidden_irreps_out,
                 correlation=correlation,
                 num_elements=num_elements,
                 use_sc=True,
             )
             self.products.append(prod)
             
-            # Add readout for this interaction
-            self.readouts.append(
-                NonLinearReadoutBlock(
-                    hidden_irreps,
-                    MLP_irreps,
-                    gate,
-                    o3.Irreps("4x0e"),  # Output 4 scalars
-                    4,  # Number of outputs
-                    cueq_config,
-                    None
+            if i == num_interactions - 2:
+                self.readouts.append(
+                    NonLinearReadoutBlock(
+                        hidden_irreps_out,
+                        MLP_irreps,
+                        gate,
+                        o3.Irreps("4x0e"),
+                        4,
+                        cueq_config,
+                        None
+                    )
                 )
-            )
-
+            else:
+                self.readouts.append(
+                    LinearReadoutBlock(
+                        hidden_irreps_out,
+                        o3.Irreps("4x0e"),
+                        cueq_config,
+                        None
+                        )
+                    )
+            
+           
     def forward(
         self,
         data: Dict[str, torch.Tensor],
@@ -1231,6 +1244,7 @@ class XDMsAndVeffMACE(torch.nn.Module):
         compute_displacement: bool = False,
         compute_edge_forces: bool = False,
         compute_atomic_stresses: bool = False,
+        **kwargs
     ) -> Dict[str, Optional[torch.Tensor]]:
         # Explicitly disable all energy/force-related computations
         assert not compute_force, "XDMsAndVeffMace does not compute forces"
@@ -1299,12 +1313,14 @@ class XDMsAndVeffMACE(torch.nn.Module):
         M3 = torch.sum(torch.stack(all_M3, dim=-1), dim=-1)
         Veff = torch.sum(torch.stack(all_Veff, dim=-1), dim=-1)
 
-        return {
-            "M1": M1,
-            "M2": M2,
-            "M3": M3,
-            "Veff": Veff,
+        output = {
+            "M1":M1,
+            "M2":M2,
+            "M3":M3,
+            "Veff":Veff,
         }
+        
+        return output
 
         
      

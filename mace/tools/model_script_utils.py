@@ -37,6 +37,11 @@ def configure_model(
         "virials": compute_virials,
         "stress": compute_stress,
         "dipoles": args.compute_dipole,
+        #Adding the M1,M2,M3 and Veff,
+        "M1":True,
+        "M2":True,
+        "M3":True,
+        "Veff": True
     }
     logging.info(
         f"During training the following quantities will be reported: {', '.join([f'{report}' for report, value in output_args.items() if value])}"

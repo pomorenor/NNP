@@ -545,6 +545,10 @@ def evaluate(
             compute_force=output_args["forces"],
             compute_virials=output_args["virials"],
             compute_stress=output_args["stress"],
+            compute_M1=output_args["M1"],
+            compute_M2=output_args["M2"],
+            compute_M3=output_args["M3"],
+            compute_Veff=output_args["Veff"]
         )
         avg_loss, aux = metrics(batch, output)
 
@@ -584,6 +588,18 @@ class MACELoss(Metric):
         self.add_state("delta_mus", default=[], dist_reduce_fx="cat")
         self.add_state("delta_mus_per_atom", default=[], dist_reduce_fx="cat")
 
+        ## Adding M1,M2,M3 and Veff errors
+        self.add_state("M1s", default=[], dist_reduce_fx="cat")
+        self.add_state("M2s", default=[], dist_reduce_fx="cat")
+        self.add_state("M3s", default=[], dist_reduce_fx="cat")
+        self.add_state("Veffs", default=[], dist_reduce_fx="cat")
+
+        self.add_state("delta_m1", default=[], dist_reduce_fx="cat")
+        self.add_state("delta_m2", default=[], dist_reduce_fx="cat")
+        self.add_state("delta_m3", default=[], dist_reduce_fx="cat")
+        self.add_state("delta_veff", default=[], dist_reduce_fx="cat")
+
+
     def update(self, batch, output):  # pylint: disable=arguments-differ
         loss = self.loss_fn(pred=output, ref=batch)
         self.total_loss += loss
@@ -617,6 +633,23 @@ class MACELoss(Metric):
                 (batch.dipole - output["dipole"])
                 / (batch.ptr[1:] - batch.ptr[:-1]).unsqueeze(-1)
             )
+
+        if "M1" in output and "M1" in batch:
+            self.M1s.append(batch["M1"])
+            self.delta_m1.append(batch["M1"] - output["M1"])
+
+        if "M2" in output and "M2" in batch:
+            self.M2s.append(batch["M2"])
+            self.delta_m2.append(batch["M2"] - output["M2"])
+
+        if "M3" in output and "M3" in batch:
+            self.M3s.append(batch["M3"])
+            self.delta_m3.append(batch["M3"] - output["M3"])
+
+        if "Veff" in output and "Veff" in batch:
+            self.Veffs.append(batch["Veff"])
+            self.delta_veff.append(batch["Veff"] - output["Veff"])
+
 
     def convert(self, delta: Union[torch.Tensor, List[torch.Tensor]]) -> np.ndarray:
         if isinstance(delta, list):
@@ -665,5 +698,38 @@ class MACELoss(Metric):
             aux["rmse_mu_per_atom"] = compute_rmse(delta_mus_per_atom)
             aux["rel_rmse_mu"] = compute_rel_rmse(delta_mus, mus)
             aux["q95_mu"] = compute_q95(delta_mus)
+
+        if self.M1s:
+            m1s = self.convert(self.M1s)
+            delta_m1 = self.convert(self.delta_m1)
+            aux["mae_m1"] = compute_mae(delta_m1)
+            aux["rmse_m1"] = compute_rmse(delta_m1)
+            aux["rel_mae_m1"] = compute_rel_mae(delta_m1, m1s)
+            aux["rel_rmse_m1"] = compute_rel_rmse(delta_m1, m1s)
+
+        if self.M2s:
+            m2s = self.convert(self.M2s)
+            delta_m2 = self.convert(self.delta_m2)
+            aux["mae_m2"] = compute_mae(delta_m2)
+            aux["rmse_m2"] = compute_rmse(delta_m2)
+            aux["rel_mae_m2"] = compute_rel_mae(delta_m2, m2s)
+            aux["rel_rmse_m2"] = compute_rel_rmse(delta_m2, m2s)
+
+        if self.M3s:
+            m3s = self.convert(self.M3s)
+            delta_m3 = self.convert(self.delta_m3)
+            aux["mae_m3"] = compute_mae(delta_m3)
+            aux["rmse_m3"] = compute_rmse(delta_m3)
+            aux["rel_mae_m3"] = compute_rel_mae(delta_m3, m3s)
+            aux["rel_rmse_m3"] = compute_rel_rmse(delta_m3, m3s)
+
+        if self.Veffs:
+            veffs = self.convert(self.Veffs)
+            delta_veff = self.convert(self.delta_veff)
+            aux["mae_veff"] = compute_mae(delta_veff)
+            aux["rmse_veff"] = compute_rmse(delta_veff)
+            aux["rel_mae_veff"] = compute_rel_mae(delta_veff, veffs)
+            aux["rel_rmse_veff"] = compute_rel_rmse(delta_veff, veffs)
+
 
         return aux["loss"], aux

@@ -149,7 +149,7 @@ class AtomicData(torch_geometric.data.Data):
             "M1_weight": M1_weight,
             "M2_weight": M2_weight,
             "M3_weight": M3_weight,
-            "Veff_weight": Veff,
+            "Veff_weight": Veff_weight,
             ###
             "forces": forces,
             "energy": energy,

@@ -162,7 +162,7 @@ def run(args: argparse.Namespace) -> None:
     for batch in data_loader:
         batch = batch.to(device)
         output = model(batch.to_dict(), compute_stress=args.compute_stress)
-        energies_list.append(torch_tools.to_numpy(output["energy"]))
+        #energies_list.append(torch_tools.to_numpy(output["energy"]))
         if args.compute_stress:
             stresses_list.append(torch_tools.to_numpy(output["stress"]))
 
@@ -214,18 +214,18 @@ def run(args: argparse.Namespace) -> None:
                 ]  # drop last as its empty
             )
 
-        forces = np.split(
-            torch_tools.to_numpy(output["forces"]),
-            indices_or_sections=batch.ptr[1:],
-            axis=0,
-        )
-        forces_collection.append(forces[:-1])  # drop last as its empty
+        #forces = np.split(
+        #    torch_tools.to_numpy(output["forces"]),
+         #   indices_or_sections=batch.ptr[1:],
+         #   axis=0,
+        #)
+        #forces_collection.append(forces[:-1])  # drop last as its empty
 
-    energies = np.concatenate(energies_list, axis=0)
-    forces_list = [
-        forces for forces_list in forces_collection for forces in forces_list
-    ]
-    assert len(atoms_list) == len(energies) == len(forces_list)
+    #energies = np.concatenate(energies_list, axis=0)
+    #forces_list = [
+     #   forces for forces_list in forces_collection for forces in forces_list
+   # ]
+    #assert len(atoms_list) == len(energies) == len(forces_list)
     if args.compute_stress:
         stresses = np.concatenate(stresses_list, axis=0)
         assert len(atoms_list) == stresses.shape[0]
@@ -245,8 +245,8 @@ def run(args: argparse.Namespace) -> None:
     # Store data in atoms objects
     for i, (atoms, energy, forces) in enumerate(zip(atoms_list, energies, forces_list)):
         atoms.calc = None  # crucial
-        atoms.info[args.info_prefix + "energy"] = energy
-        atoms.arrays[args.info_prefix + "forces"] = forces
+        #atoms.info[args.info_prefix + "energy"] = energy
+        #atoms.arrays[args.info_prefix + "forces"] = forces
 
         if args.compute_stress:
             atoms.info[args.info_prefix + "stress"] = stresses[i]
