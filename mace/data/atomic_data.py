@@ -365,7 +365,7 @@ class AtomicData(torch_geometric.data.Data):
                 config.properties.get("Veff"), dtype=torch.get_default_dtype()
             )
             if config.properties.get("Veff") is not None
-            else torch.tensor(num_atoms, dtype=torch.get_default_dtype())
+            else torch.zeros(num_atoms, dtype=torch.get_default_dtype())
         )
         
         return cls(
