@@ -22,6 +22,7 @@ from torch.optim.swa_utils import SWALR, AveragedModel
 from mace import data, modules, tools
 from mace.data import KeySpecification
 from mace.tools.train import SWAContainer
+from mace.tools.utils import AtomicNumberTable
 
 
 @dataclasses.dataclass
@@ -574,6 +575,8 @@ def get_loss_fn(
     args: argparse.Namespace,
     dipole_only: bool,
     compute_dipole: bool,
+    z_table: Optional[AtomicNumberTable] = None
+    
 ) -> torch.nn.Module:
     if args.loss == "weighted":
         loss_fn = modules.WeightedEnergyForcesLoss(
