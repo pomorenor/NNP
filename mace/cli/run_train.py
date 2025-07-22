@@ -81,6 +81,14 @@ def run(args) -> None:
     tag = tools.get_tag(name=args.name, seed=args.seed)
     args, input_log_messages = tools.check_args(args)
 
+
+   # logging.info("Raw arguments received:")
+   # for arg in vars(args):
+   #     logging.info(f"{arg}: {getattr(args, arg)}")
+    
+    train_atom_z = args.train_atom_z
+
+
     # default keyspec to update using heads dictionary
     args.key_specification = KeySpecification()
     update_keyspec_from_kwargs(args.key_specification, vars(args))
@@ -639,7 +647,7 @@ def run(args) -> None:
             generator=torch.Generator().manual_seed(args.seed),
         )
 
-    loss_fn = get_loss_fn(args, dipole_only, args.compute_dipole, z_table)
+    loss_fn = get_loss_fn(args, dipole_only, args.compute_dipole)
     args.avg_num_neighbors = get_avg_num_neighbors(head_configs, args, train_loader, device)
 
     # Model

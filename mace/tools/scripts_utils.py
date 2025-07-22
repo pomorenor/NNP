@@ -575,9 +575,12 @@ def get_loss_fn(
     args: argparse.Namespace,
     dipole_only: bool,
     compute_dipole: bool,
-    z_table: Optional[AtomicNumberTable] = None
+
     
 ) -> torch.nn.Module:
+
+    #assert args.train_atom_z is None, "Specify atomic number of the atom for training"
+
     if args.loss == "weighted":
         loss_fn = modules.WeightedEnergyForcesLoss(
             energy_weight=args.energy_weight, forces_weight=args.forces_weight
@@ -634,7 +637,8 @@ def get_loss_fn(
             M1_weight= args.M1_weight,
             M2_weight= args.M2_weight,
             M3_weight= args.M3_weight,
-            Veff_weight= args.Veff_weight
+            Veff_weight= args.Veff_weight,
+            z_target= args.train_atom_z,
         )
     else:
         loss_fn = modules.WeightedEnergyForcesLoss(energy_weight=1.0, forces_weight=1.0)

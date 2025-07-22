@@ -176,15 +176,22 @@ def weighted_mean_squared_error_dipole(
 
 
 def weighted_mean_squared_error_M1(
-    ref: Batch, pred: TensorDict, ddp: Optional[bool] = None
+        ref: Batch, pred: TensorDict, ddp: Optional[bool] = None, z_target_tensor: Optional[torch.Tensor] = None
 ) -> torch.Tensor:
     
 
-    z_target = 17
+    z_target = z_target_tensor.item()
 
 
 
     species_mask = ref["node_attrs"][:, z_to_index[z_target]].bool()  # One-hot encoding for Z_target
+
+    if species_mask.sum() == 0:
+    # Atom not found in the batch
+        return torch.tensor(0.0, device=ref["M1"].device)
+
+
+
 
     # Step 2: Compute number of atoms per graph in the batch
     num_atoms = (ref.ptr[1:] - ref.ptr[:-1])[ref.batch]  # Broadcast per-atom
@@ -194,9 +201,12 @@ def weighted_mean_squared_error_M1(
     m1_pred = pred["M1"][species_mask]
     norm = num_atoms[species_mask]
 
+    
+    #print("El resultado es el siguiente mi pez: ", z_target-6)
+    #assert z_target == 6, f"Expected z_target=6 but got {z_target}"
+    #print("To see if it is the desired atom :)")
+    #print(m1_true)
 
-    print("To see if it is hydrogen :)")
-    print(m1_true)
 
     # Step 4: Compute the normalized squared error
     raw_loss = torch.square((m1_true - m1_pred) / norm)
@@ -212,10 +222,42 @@ def weighted_mean_squared_error_M1(
 #-------------------------------------------------------------------------------
 
 def weighted_mean_squared_error_M2(
-    ref: Batch, pred: TensorDict, ddp: Optional[bool] = None
+        ref: Batch, pred: TensorDict, ddp: Optional[bool] = None, z_target_tensor: Optional[torch.Tensor] = None
 ) -> torch.Tensor:
-    num_atoms = (ref.ptr[1:] - ref.ptr[:-1]).unsqueeze(-1)
-    raw_loss = torch.square((ref["M2"] - pred["M2"]) / num_atoms)
+    
+
+    z_target = z_target_tensor.item()
+
+
+
+    species_mask = ref["node_attrs"][:, z_to_index[z_target]].bool()  # One-hot encoding for Z_target
+
+    if species_mask.sum() == 0:
+    # Atom not found in the batch
+        return torch.tensor(0.0, device=ref["M2"].device)
+
+
+
+
+    # Step 2: Compute number of atoms per graph in the batch
+    num_atoms = (ref.ptr[1:] - ref.ptr[:-1])[ref.batch]  # Broadcast per-atom
+
+    # Step 3: Apply the mask to M2 and num_atoms
+    m2_true = ref["M2"][species_mask]
+    m2_pred = pred["M2"][species_mask]
+    norm = num_atoms[species_mask]
+
+    
+    #print("El resultado es el siguiente mi pez: ", z_target-6)
+    #assert z_target == 6, f"Expected z_target=6 but got {z_target}"
+    #print("To see if it is the desired atom :)")
+    #print(m1_true)
+
+
+    # Step 4: Compute the normalized squared error
+    raw_loss = torch.square((m2_true - m2_pred) / norm)
+
+    # Step 5: Reduce the loss across batch or DDP
     return reduce_loss(raw_loss, ddp)
 
 #-------------------------------------------------------------------------------
@@ -223,11 +265,44 @@ def weighted_mean_squared_error_M2(
 #-------------------------------------------------------------------------------
 
 def weighted_mean_squared_error_M3(
-    ref: Batch, pred: TensorDict, ddp: Optional[bool] = None
+        ref: Batch, pred: TensorDict, ddp: Optional[bool] = None, z_target_tensor: Optional[torch.Tensor] = None
 ) -> torch.Tensor:
-    num_atoms = (ref.ptr[1:] - ref.ptr[:-1]).unsqueeze(-1)
-    raw_loss = torch.square((ref["M3"] - pred["M3"]) / num_atoms)
+    
+
+    z_target = z_target_tensor.item()
+
+
+
+    species_mask = ref["node_attrs"][:, z_to_index[z_target]].bool()  # One-hot encoding for Z_target
+
+    if species_mask.sum() == 0:
+    # Atom not found in the batch
+        return torch.tensor(0.0, device=ref["M3"].device)
+
+
+
+
+    # Step 2: Compute number of atoms per graph in the batch
+    num_atoms = (ref.ptr[1:] - ref.ptr[:-1])[ref.batch]  # Broadcast per-atom
+
+    # Step 3: Apply the mask to M2 and num_atoms
+    m3_true = ref["M3"][species_mask]
+    m3_pred = pred["M3"][species_mask]
+    norm = num_atoms[species_mask]
+
+    
+    #print("El resultado es el siguiente mi pez: ", z_target-6)
+    #assert z_target == 6, f"Expected z_target=6 but got {z_target}"
+    #print("To see if it is the desired atom :)")
+    #print(m1_true)
+
+
+    # Step 4: Compute the normalized squared error
+    raw_loss = torch.square((m3_true - m3_pred) / norm)
+
+    # Step 5: Reduce the loss across batch or DDP
     return reduce_loss(raw_loss, ddp)
+
 
 
 #-------------------------------------------------------------------------------
@@ -235,7 +310,7 @@ def weighted_mean_squared_error_M3(
 #-------------------------------------------------------------------------------
 
 def weighted_mean_squared_error_Veff(
-    ref: Batch, pred: TensorDict, ddp: Optional[bool] = None
+    ref: Batch, pred: TensorDict, ddp: Optional[bool] = None, z_target: Optional[int] = None
 ) -> torch.Tensor:
     num_atoms = (ref.ptr[1:] - ref.ptr[:-1]).unsqueeze(-1)
     raw_loss = torch.square((ref["Veff"] - pred["Veff"]) / num_atoms)
@@ -315,7 +390,7 @@ def conditional_huber_forces(
 # be better individually? ... Je ne sais pas
 
 class WeightedXDMsVeffLoss(torch.nn.Module):
-    def __init__(self, M1_weight=1.0, M2_weight=1.0, M3_weight=1.0, Veff_weight=1.0) -> None:
+    def __init__(self, M1_weight=1.0, M2_weight=1.0, M3_weight=1.0, Veff_weight=1.0, z_target=1) -> None:
         super().__init__()
         self.register_buffer(
             "M1_weight",
@@ -333,14 +408,19 @@ class WeightedXDMsVeffLoss(torch.nn.Module):
             "Veff_weight",
             torch.tensor(Veff_weight, dtype=torch.get_default_dtype()),
         )
+        self.register_buffer(
+            "z_target",
+            torch.tensor(z_target,
+                       dtype=int),  
+        )
         
     def forward(
         self, ref: Batch, pred: TensorDict, ddp: Optional[bool] = None
         ) -> torch.Tensor:
-        loss_M1 = weighted_mean_squared_error_M1(ref, pred, ddp)
-        loss_M2 = weighted_mean_squared_error_M2(ref, pred, ddp)
-        loss_M3 = weighted_mean_squared_error_M3(ref, pred, ddp)
-        loss_Veff = weighted_mean_squared_error_Veff(ref, pred, ddp)
+        loss_M1 = weighted_mean_squared_error_M1(ref, pred, ddp, self.z_target)
+        loss_M2 = weighted_mean_squared_error_M2(ref, pred, ddp, self.z_target)
+        loss_M3 = weighted_mean_squared_error_M3(ref, pred, ddp, self.z_target)
+        loss_Veff = weighted_mean_squared_error_Veff(ref, pred, ddp, self.z_target)
         return self.M1_weight*loss_M1 + self.M2_weight*loss_M2 + self.M3_weight*loss_M3 + self.Veff_weight*loss_Veff
 
     def __repr__(self):
