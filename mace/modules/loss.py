@@ -13,6 +13,22 @@ from mace.tools import TensorDict
 from mace.tools.torch_geometric import Batch
 
 
+#------------------------------------------------------------------------------
+#  Define the map from one-hot encoding to atomic numbers for loss function 
+#  of XDM and Veff
+#------------------------------------------------------------------------------
+
+z_to_index = {
+    1:0,
+    6:1,
+    7:2,
+    8:3,
+    9:4,
+    16:5,
+    17:6
+        }
+
+
 # ------------------------------------------------------------------------------
 # Helper function for loss reduction that handles DDP correction
 # ------------------------------------------------------------------------------
@@ -158,12 +174,38 @@ def weighted_mean_squared_error_dipole(
 # XDM Multipole M1 Loss Function
 #-------------------------------------------------------------------------------
 
+
 def weighted_mean_squared_error_M1(
     ref: Batch, pred: TensorDict, ddp: Optional[bool] = None
 ) -> torch.Tensor:
-    num_atoms = (ref.ptr[1:] - ref.ptr[:-1]).unsqueeze(-1)
-    raw_loss = torch.square((ref["M1"] - pred["M1"]) / num_atoms)
+    
+
+    z_target = 17
+
+
+
+    species_mask = ref["node_attrs"][:, z_to_index[z_target]].bool()  # One-hot encoding for Z_target
+
+    # Step 2: Compute number of atoms per graph in the batch
+    num_atoms = (ref.ptr[1:] - ref.ptr[:-1])[ref.batch]  # Broadcast per-atom
+
+    # Step 3: Apply the mask to M2 and num_atoms
+    m1_true = ref["M1"][species_mask]
+    m1_pred = pred["M1"][species_mask]
+    norm = num_atoms[species_mask]
+
+
+    print("To see if it is hydrogen :)")
+    print(m1_true)
+
+    # Step 4: Compute the normalized squared error
+    raw_loss = torch.square((m1_true - m1_pred) / norm)
+
+    # Step 5: Reduce the loss across batch or DDP
     return reduce_loss(raw_loss, ddp)
+
+    
+    
 
 #-------------------------------------------------------------------------------
 # XDM Multipole M2 Loss Function

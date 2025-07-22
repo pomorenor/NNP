@@ -635,6 +635,17 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--dipole_weight", help="weight of dipoles loss", type=float, default=1.0
     )
+
+    # Testing atom specification for training
+    
+    parser.add_argument(
+        "--train_atom_z",
+        help="Atomic number of atom to train",
+        type=int,
+        default=None,
+    )
+
+
     # Added XDMs and Veffs weight flags 
 
     parser.add_argument(
@@ -1001,6 +1012,14 @@ def build_preprocess_arg_parser() -> argparse.ArgumentParser:
         default=DefaultKeys.CHARGES.value,
     )
 
+#Added key to train properties for only one atom
+    #parser.add_argument(
+     #   "--train_atom_z",
+      #  help="Atomic number of atom to train",
+       # type=int,
+        #default=None,
+    #)
+    
 #Added XDM and Veff to arguments
     parser.add_argument(
         "--M1_key",

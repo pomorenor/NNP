@@ -41,6 +41,7 @@ class HeadConfig:
     train_loader: Optional[torch.utils.data.DataLoader] = None
     z_table: Optional[Any] = None
     atomic_energies_dict: Optional[Dict[str, float]] = None
+    #train_atom_z: Optional[int] = None
 
 
 def dict_head_to_dataclass(
@@ -72,6 +73,9 @@ def dict_head_to_dataclass(
         avg_num_neighbors=head.get("avg_num_neighbors", args.avg_num_neighbors),
         key_specification=head["key_specification"],
         keep_isolated_atoms=head.get("keep_isolated_atoms", args.keep_isolated_atoms),
+
+        #Adding for training only for specified atom
+        #train_atom_z=head.get("train_atom_z", args.train_atom_z),
     )
 
 
@@ -89,6 +93,8 @@ def prepare_default_head(args: argparse.Namespace) -> Dict[str, Any]:
             "valid_fraction": args.valid_fraction,
             "config_type_weights": args.config_type_weights,
             "keep_isolated_atoms": args.keep_isolated_atoms,
+            #Adding for training only for specified atom
+            "train_atom_z":args.train_atom_z,
         }
     }
 
