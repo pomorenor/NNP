@@ -12,7 +12,7 @@ import torch.distributed as dist
 from mace.tools import TensorDict
 from mace.tools.torch_geometric import Batch
 
-
+ 
 #------------------------------------------------------------------------------
 #  Define the map from one-hot encoding to atomic numbers for loss function 
 #  of XDM and Veff
@@ -310,11 +310,45 @@ def weighted_mean_squared_error_M3(
 #-------------------------------------------------------------------------------
 
 def weighted_mean_squared_error_Veff(
-    ref: Batch, pred: TensorDict, ddp: Optional[bool] = None, z_target: Optional[int] = None
+     ref: Batch, pred: TensorDict, ddp: Optional[bool] = None, z_target_tensor: Optional[torch.Tensor] = None
 ) -> torch.Tensor:
-    num_atoms = (ref.ptr[1:] - ref.ptr[:-1]).unsqueeze(-1)
-    raw_loss = torch.square((ref["Veff"] - pred["Veff"]) / num_atoms)
+    
+
+    z_target = z_target_tensor.item()
+
+
+
+    species_mask = ref["node_attrs"][:, z_to_index[z_target]].bool()  # One-hot encoding for Z_target
+
+    if species_mask.sum() == 0:
+    # Atom not found in the batch
+        return torch.tensor(0.0, device=ref["Veff"].device)
+
+
+
+
+    # Step 2: Compute number of atoms per graph in the batch
+    num_atoms = (ref.ptr[1:] - ref.ptr[:-1])[ref.batch]  # Broadcast per-atom
+
+    # Step 3: Apply the mask to M2 and num_atoms
+    Veff_true = ref["Veff"][species_mask]
+    Veff_pred = pred["Veff"][species_mask]
+    norm = num_atoms[species_mask]
+
+    
+    #print("El resultado es el siguiente mi pez: ", z_target-6)
+    #assert z_target == 6, f"Expected z_target=6 but got {z_target}"
+    #print("To see if it is the desired atom :)")
+    #print(m1_true)
+
+
+    # Step 4: Compute the normalized squared error
+    raw_loss = torch.square((Veff_true - Veff_pred) / norm)
+
+    # Step 5: Reduce the loss across batch or DDP
     return reduce_loss(raw_loss, ddp)
+
+   
 
 
 

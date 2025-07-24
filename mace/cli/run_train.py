@@ -86,7 +86,7 @@ def run(args) -> None:
    # for arg in vars(args):
    #     logging.info(f"{arg}: {getattr(args, arg)}")
     
-    train_atom_z = args.train_atom_z
+    target_z = args.train_atom_z
 
 
     # default keyspec to update using heads dictionary
@@ -808,6 +808,7 @@ def run(args) -> None:
         plotter=plotter,
         train_sampler=train_sampler,
         rank=rank,
+        z_target=target_z,
     )
 
     logging.info("")
@@ -959,7 +960,7 @@ def run(args) -> None:
         skip_heads = args.skip_evaluate_heads.split(",") if args.skip_evaluate_heads else []
         if skip_heads:
             logging.info(f"Skipping evaluation for heads: {skip_heads}")
-        table_train_valid = create_error_table(
+            table_train_valid = create_error_table(
             table_type=args.error_table,
             all_data_loaders=train_valid_data_loader,
             model=model_to_evaluate,
@@ -969,6 +970,7 @@ def run(args) -> None:
             device=device,
             distributed=args.distributed,
             skip_heads=skip_heads,
+            z_target=target_z
         )
         logging.info("Error-table on TRAIN and VALID:\n" + str(table_train_valid))
 

@@ -30,6 +30,7 @@ def create_error_table(
     device: str,
     distributed: bool = False,
     skip_heads: Optional[List[str]] = None,
+    z_target: Optional[int] = None,
 ) -> PrettyTable:
     if log_wandb:
         import wandb
@@ -137,6 +138,7 @@ def create_error_table(
             data_loader=data_loader,
             output_args=output_args,
             device=device,
+            z_target=z_target,
         )
         if distributed:
             torch.distributed.barrier()

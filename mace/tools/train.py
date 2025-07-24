@@ -36,6 +36,26 @@ from .utils import (
 )
 
 
+ 
+#------------------------------------------------------------------------------
+#  Define the map from one-hot encoding to atomic numbers for loss function 
+#  of XDM and Veff
+#------------------------------------------------------------------------------
+
+z_to_index = {
+    1:0,
+    6:1,
+    7:2,
+    8:3,
+    9:4,
+    16:5,
+    17:6
+        }
+
+#------------------------------------------------------------------------------
+
+
+
 @dataclasses.dataclass
 class SWAContainer:
     model: AveragedModel
@@ -164,6 +184,7 @@ def train(
     distributed_model: Optional[DistributedDataParallel] = None,
     train_sampler: Optional[DistributedSampler] = None,
     rank: Optional[int] = 0,
+    z_target : Optional[int] = None,
 ):
     lowest_loss = np.inf
     valid_loss = np.inf
@@ -190,6 +211,7 @@ def train(
             data_loader=valid_loader,
             output_args=output_args,
             device=device,
+            z_target=z_target
         )
         valid_err_log(
             valid_loss_head, eval_metrics, logger, log_errors, None, valid_loader_name
@@ -256,6 +278,7 @@ def train(
                         data_loader=valid_loader,
                         output_args=output_args,
                         device=device,
+                        z_target=z_target,
                     )
                     if rank == 0:
                         valid_err_log(
@@ -529,11 +552,13 @@ def evaluate(
     data_loader: DataLoader,
     output_args: Dict[str, bool],
     device: torch.device,
+    z_target: Optional[int] = None,
+    
 ) -> Tuple[float, Dict[str, Any]]:
     for param in model.parameters():
         param.requires_grad = False
 
-    metrics = MACELoss(loss_fn=loss_fn).to(device)
+    metrics = MACELoss(loss_fn=loss_fn, z_target = z_target).to(device)
 
     start_time = time.time()
     for batch in data_loader:
@@ -550,7 +575,7 @@ def evaluate(
             compute_M3=output_args["M3"],
             compute_Veff=output_args["Veff"]
         )
-        avg_loss, aux = metrics(batch, output)
+        avg_loss, aux = metrics(batch, output, z_target)
 
     avg_loss, aux = metrics.compute()
     aux["time"] = time.time() - start_time
@@ -563,7 +588,7 @@ def evaluate(
 
 
 class MACELoss(Metric):
-    def __init__(self, loss_fn: torch.nn.Module):
+    def __init__(self, loss_fn: torch.nn.Module, z_target: Optional[int] = None):
         super().__init__()
         self.loss_fn = loss_fn
         self.add_state("total_loss", default=torch.tensor(0.0), dist_reduce_fx="sum")
@@ -600,7 +625,7 @@ class MACELoss(Metric):
         self.add_state("delta_veff", default=[], dist_reduce_fx="cat")
 
 
-    def update(self, batch, output):  # pylint: disable=arguments-differ
+    def update(self, batch, output, z_target):  # pylint: disable=arguments-differ
         loss = self.loss_fn(pred=output, ref=batch)
         self.total_loss += loss
         self.num_data += batch.num_graphs
@@ -635,20 +660,45 @@ class MACELoss(Metric):
             )
 
         if "M1" in output and "M1" in batch:
-            self.M1s.append(batch["M1"])
-            self.delta_m1.append(batch["M1"] - output["M1"])
 
+
+            species_mask = batch["node_attrs"][:, z_to_index[z_target]].bool()
+
+            if species_mask.sum() > 0:
+                self.M1s.append(batch["M1"][species_mask])
+                self.delta_m1.append(batch["M1"][species_mask]- output["M1"][species_mask])
+                    
         if "M2" in output and "M2" in batch:
-            self.M2s.append(batch["M2"])
-            self.delta_m2.append(batch["M2"] - output["M2"])
+
+
+            species_mask = batch["node_attrs"][:, z_to_index[z_target]].bool()
+
+            if species_mask.sum() > 0:
+                self.M2s.append(batch["M2"][species_mask])
+                self.delta_m2.append(batch["M2"][species_mask]- output["M2"][species_mask])
+
 
         if "M3" in output and "M3" in batch:
-            self.M3s.append(batch["M3"])
-            self.delta_m3.append(batch["M3"] - output["M3"])
+
+
+            species_mask = batch["node_attrs"][:, z_to_index[z_target]].bool()
+
+            if species_mask.sum() > 0:
+                self.M3s.append(batch["M3"][species_mask])
+                self.delta_m3.append(batch["M3"][species_mask]- output["M3"][species_mask])
+
 
         if "Veff" in output and "Veff" in batch:
-            self.Veffs.append(batch["Veff"])
-            self.delta_veff.append(batch["Veff"] - output["Veff"])
+
+
+
+            species_mask = batch["node_attrs"][:, z_to_index[z_target]].bool()
+
+            if species_mask.sum() > 0:
+                self.Veffs.append(batch["Veff"][species_mask])
+                self.delta_veff.append(batch["Veff"][species_mask]- output["Veff"][species_mask])
+
+           
 
 
     def convert(self, delta: Union[torch.Tensor, List[torch.Tensor]]) -> np.ndarray:
